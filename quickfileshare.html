@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuickFileShare Pair</title>
+  <style>
+    :root { color-scheme: light; --bg:#f5f7fb; --panel:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b; --accent:#2563eb; --ok:#16a34a; --bad:#dc2626; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:linear-gradient(135deg,#eff6ff,#f8fafc 55%,#e0f2fe); color:var(--text); }
+    .wrap { width:min(960px, calc(100vw - 28px)); display:grid; grid-template-columns:360px 1fr; gap:18px; }
+    .card { background:rgba(255,255,255,.9); border:1px solid var(--line); border-radius:24px; padding:22px; box-shadow:0 22px 70px rgba(15,23,42,.10); }
+    h1 { margin:0; font-size:30px; }
+    h2 { margin:0 0 12px; font-size:17px; }
+    .muted { color:var(--muted); }
+    .qrbox { display:grid; place-items:center; min-height:300px; border:1px dashed #bfdbfe; border-radius:18px; background:#fff; margin:16px 0; }
+    #qrcode canvas, #qrcode img { width:260px; height:260px; }
+    button, input, textarea { font:inherit; }
+    button { border:1px solid var(--line); border-radius:12px; padding:10px 13px; background:#fff; font-weight:800; cursor:pointer; }
+    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    input, textarea { width:100%; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff; }
+    textarea { min-height:92px; resize:vertical; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .log { height:220px; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; background:#0f172a; color:#cbd5e1; border-radius:14px; padding:12px; }
+    .ok { color:var(--ok); font-weight:800; }
+    .bad { color:var(--bad); font-weight:800; }
+    code { word-break:break-all; color:#1d4ed8; }
+    @media (max-width:820px) { .wrap { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>QuickFileShare</h1>
+      <p class="muted">电脑端零安装入口。手机 App 点「扫一扫」扫描下面二维码。</p>
+      <div class="qrbox"><div id="qrcode"></div></div>
+      <div class="row">
+        <button class="primary" id="regen">重新生成二维码</button>
+        <button id="copyPair">复制配对内容</button>
+      </div>
+      <p class="muted">配对内容：</p>
+      <code id="pairText"></code>
+    </section>
+
+    <section class="card">
+      <h2>连接手机网盘</h2>
+      <p class="muted">扫码后手机会启动文件服务器，并通过配对 relay 通知本网页自动跳转；本页不再扫描局域网。</p>
+      <div class="row">
+        <button id="stop">停止等待</button>
+      </div>
+      <p class="muted">配对 relay：</p>
+      <div class="row">
+        <input id="relay" value="http://121.40.159.61/qfs-relay" style="flex:1; min-width:260px;">
+        <button id="saveRelay">保存</button>
+      </div>
+      <p class="muted">如果 relay 收到的地址不是电脑可访问地址，可以手动填手机服务地址：</p>
+      <div class="row">
+        <input id="manual" placeholder="http://192.168.1.23:18080" style="flex:1; min-width:260px;">
+        <button id="openManual">打开</button>
+      </div>
+      <p id="status" class="muted">等待扫码。</p>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script src="vendor/qrcode.min.js"></script>
+  <script>
+    var token = '';
+    var pair = '';
+    var stopped = false;
+    var relayEvents = null;
+    var pollTimer = null;
+
+    function randomToken() {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      return Array.from(buf).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    }
+    function log(msg, cls) {
+      var box = document.getElementById('log');
+      var div = document.createElement('div');
+      if (cls) div.className = cls;
+      div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      box.prepend(div);
+    }
+    function setStatus(msg, cls) {
+      var el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = cls || 'muted';
+    }
+    function relayURL() {
+      return document.getElementById('relay').value.trim().replace(/\/$/, '');
+    }
+    function stopWaiting(msg) {
+      stopped = true;
+      if (relayEvents) {
+        relayEvents.close();
+        relayEvents = null;
+      }
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+      if (msg) {
+        setStatus(msg);
+        log(msg);
+      }
+    }
+    function makeQR() {
+      stopWaiting();
+      token = randomToken();
+      var relay = relayURL();
+      pair = 'quickfileshare://pair?token=' + encodeURIComponent(token) + '&port=18080' + (relay ? '&relay=' + encodeURIComponent(relay) : '');
+      document.getElementById('pairText').textContent = pair;
+      var q = document.getElementById('qrcode');
+      q.innerHTML = '';
+      new QRCode(q, {text: pair, width: 260, height: 260, correctLevel: QRCode.CorrectLevel.M});
+      stopped = false;
+      setStatus('二维码已生成，等待手机扫码。');
+      log('生成新 token ' + token.slice(0, 8) + '...');
+      if (location.protocol === 'https:' && relay.indexOf('http://') === 0) {
+        setStatus('当前页面是 HTTPS，但 relay 是 HTTP，浏览器会拦截连接。请换成 HTTPS relay，或先用本地文件/HTTP 页面打开。', 'bad');
+        log('HTTPS 页面不能调用 HTTP relay：' + relay, 'bad');
+        return;
+      }
+      startRelayWait();
+    }
+    function openPhone(candidate, source) {
+      if (!candidate || stopped) return;
+      var base = candidate.replace(/\/$/, '');
+      var openURL = base + '/?token=' + encodeURIComponent(token);
+      stopWaiting();
+      setStatus('已收到手机地址，正在打开网盘...', 'ok');
+      log(source + ' 手机地址：' + openURL, 'ok');
+      location.href = openURL;
+    }
+    function startRelayWait() {
+      var relay = relayURL();
+      if (!relay) {
+        setStatus('未配置 relay。请填写 relay 地址后保存。', 'bad');
+        log('未配置 relay，无法等待手机上报地址', 'bad');
+        return;
+      }
+      var eventURL = relay + '/events?token=' + encodeURIComponent(token);
+      try {
+        relayEvents = new EventSource(eventURL);
+      } catch (e) {
+        log('relay SSE 连接失败：' + e.message, 'bad');
+      }
+      if (relayEvents) {
+        relayEvents.addEventListener('open', function(){ log('已连接配对 relay'); });
+        relayEvents.addEventListener('pair', function(ev){
+          try {
+            var data = JSON.parse(ev.data);
+            if (data && data.url) openPhone(data.url, 'relay');
+          } catch (e) {
+            log('解析 relay 消息失败：' + e.message, 'bad');
+          }
+        });
+        relayEvents.onerror = function(){
+          if (!stopped) log('relay SSE 断开，继续用 /api/wait 轮询');
+        };
+      }
+      pollRelay();
+    }
+    async function pollRelay() {
+      var relay = relayURL();
+      if (!relay || stopped) return;
+      try {
+        var res = await fetch(relay + '/api/wait?token=' + encodeURIComponent(token), {cache:'no-store'});
+        if (res.ok) {
+          var data = await res.json();
+          if (data && data.ok && data.pair && data.pair.url) {
+            openPhone(data.pair.url, 'relay');
+            return;
+          }
+        }
+      } catch (e) {
+        if (!stopped) log('relay 轮询失败：' + e.message, 'bad');
+      }
+      if (!stopped) pollTimer = setTimeout(pollRelay, 1800);
+    }
+
+    document.getElementById('regen').onclick = makeQR;
+    document.getElementById('copyPair').onclick = function(){ navigator.clipboard.writeText(pair); log('已复制配对内容'); };
+    document.getElementById('stop').onclick = function(){ stopWaiting('已停止等待'); };
+    document.getElementById('saveRelay').onclick = function(){ localStorage.setItem('qfsRelay', relayURL()); makeQR(); };
+    document.getElementById('openManual').onclick = function(){
+      var u = document.getElementById('manual').value.trim().replace(/\/$/, '');
+      if (!u) return;
+      location.href = u + '/?token=' + encodeURIComponent(token);
+    };
+    var savedRelay = localStorage.getItem('qfsRelay');
+    if (savedRelay) document.getElementById('relay').value = savedRelay;
+    makeQR();
+  </script>
+
+</body>
+</html>

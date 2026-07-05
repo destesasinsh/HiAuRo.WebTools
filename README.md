@@ -8,6 +8,7 @@ HiAuRo 的独立静态网页工具集合。
 - `axflow-editor.html`：Flow 轴编辑器
 - `fact-editor.html`：事实轴编辑器
 - `combat-recorder.html`：Combat Recorder 阅读器
+- `quickfileshare.html`：QuickFileShare 手机文件传输配对页
 
 这些页面设计为脱离宿主 WebUI 独立运行：
 
