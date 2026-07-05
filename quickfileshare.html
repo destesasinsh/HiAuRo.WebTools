@@ -16,8 +16,9 @@
     .qrbox { display:grid; place-items:center; min-height:300px; border:1px dashed #bfdbfe; border-radius:18px; background:#fff; margin:16px 0; }
     #qrcode canvas, #qrcode img { width:260px; height:260px; }
     button, input, textarea { font:inherit; }
-    button { border:1px solid var(--line); border-radius:12px; padding:10px 13px; background:#fff; font-weight:800; cursor:pointer; }
+    button, a.download { border:1px solid var(--line); border-radius:12px; padding:10px 13px; background:#fff; font-weight:800; cursor:pointer; text-decoration:none; color:var(--text); }
     button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    a.download { background:#ecfdf5; border-color:#86efac; color:#166534; }
     input, textarea { width:100%; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff; }
     textarea { min-height:92px; resize:vertical; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
@@ -37,7 +38,9 @@
       <div class="row">
         <button class="primary" id="regen">重新生成二维码</button>
         <button id="copyPair">复制配对内容</button>
+        <a class="download" href="./downloads/quickfileshare-agent.apk" download>下载 Android APK</a>
       </div>
+      <p class="muted">没有安装 App 时，先在手机上下载并安装 APK，再点「扫一扫」。</p>
       <p class="muted">配对内容：</p>
       <code id="pairText"></code>
     </section>

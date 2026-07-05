@@ -9,6 +9,7 @@ HiAuRo 的独立静态网页工具集合。
 - `fact-editor.html`：事实轴编辑器
 - `combat-recorder.html`：Combat Recorder 阅读器
 - `quickfileshare.html`：QuickFileShare 手机文件传输配对页
+- `downloads/quickfileshare-agent.apk`：QuickFileShare Android 端安装包
 
 这些页面设计为脱离宿主 WebUI 独立运行：
 
