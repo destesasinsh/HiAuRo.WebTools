@@ -191,7 +191,14 @@
       location.href = u + '/?token=' + encodeURIComponent(token);
     };
     var savedRelay = localStorage.getItem('qfsRelay');
-    if (savedRelay) document.getElementById('relay').value = savedRelay;
+    if (savedRelay) {
+      savedRelay = savedRelay.trim().replace(/\/$/, '');
+      if (savedRelay === 'http://121.40.159.61/qfs-relay') {
+        savedRelay = 'https://121.40.159.61/qfs-relay';
+        localStorage.setItem('qfsRelay', savedRelay);
+      }
+      document.getElementById('relay').value = savedRelay;
+    }
     makeQR();
   </script>
 
