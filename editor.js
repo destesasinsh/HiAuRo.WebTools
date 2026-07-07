@@ -248,7 +248,11 @@ function renderTree() {
     if (!timelineData) {
         treeEl.style.display = 'none';
         emptyEl.style.display = '';
-        document.getElementById('propsBody').innerHTML = '<div class="props-hint">点击节点查看属性</div>';
+        var body = document.getElementById('propsBody');
+        var hdr = document.getElementById('propsLabel');
+        if (hdr) hdr.textContent = '属性';
+        if (body) body.innerHTML = '<div class="props-hint">点击节点查看属性</div>';
+        setSelectionSummary();
         return;
     }
     emptyEl.style.display = 'none';
@@ -922,15 +926,33 @@ function renderTriggerField(ctrl, val, idx, kind) {
 
 // ==================== 属性面板 ====================
 
+function setSelectionSummary(node, type, path) {
+    var el = document.getElementById('selectionSummary');
+    if (!el) return;
+    if (!node) {
+        el.textContent = '点击节点后在中间编辑属性';
+        return;
+    }
+    var style = NODE_STYLES[type] || {};
+    var label = style.label || type || '节点';
+    var name = node.DisplayName || label;
+    el.innerHTML = '<span class="summary-type">' + esc(label) + '</span>' +
+        '<span>' + esc(name) + '</span>' +
+        '<span class="summary-path">' + esc(path || '') + '</span>';
+}
+
 function renderProps() {
     var body = document.getElementById('propsBody');
     var hdr = document.getElementById('propsLabel');
+    if (!body || !hdr) return;
 
     if (selectedNodePath && timelineData) {
         var node = getNodeByPath(selectedNodePath);
-        if (!node) { body.innerHTML = '<p class="props-hint">节点不存在</p>'; return; }
+        if (!node) { body.innerHTML = '<p class="props-hint">节点不存在</p>'; setSelectionSummary(); return; }
         var type = detectType(node);
-        hdr.textContent = '节点: ' + (node.DisplayName || NODE_STYLES[type].label);
+        var style = NODE_STYLES[type] || {};
+        hdr.textContent = '节点: ' + (node.DisplayName || style.label || '未命名');
+        setSelectionSummary(node, type, selectedNodePath);
         var h = '<div class="ed-prop-section"><div class="ed-prop-head">基础</div>';
         h += prop('名称', 'text', node, 'DisplayName');
         h += prop('ID', 'number', node, 'Id');
@@ -1025,7 +1047,7 @@ function renderProps() {
         return;
     }
 
-    hdr.textContent = '属性'; body.innerHTML = '<p class="props-hint">点击节点查看属性</p>';
+    hdr.textContent = '属性'; body.innerHTML = '<p class="props-hint">点击节点查看属性</p>'; setSelectionSummary();
 }
 
 function prop(label, type, obj, key) {
@@ -1046,6 +1068,13 @@ function bindTreePropInputs() {
             node[key] = el.type==='checkbox' ? el.checked : (el.type==='number' ? Number(el.value) : el.value);
             isDirty = true;
             renderTree();
+            if (key === 'DisplayName') {
+                var type = detectType(node);
+                var style = NODE_STYLES[type] || {};
+                var hdr = document.getElementById('propsLabel');
+                if (hdr) hdr.textContent = '节点: ' + (node.DisplayName || style.label || '未命名');
+                setSelectionSummary(node, type, selectedNodePath);
+            }
             if (refreshProps) renderProps();
             updateFooter();
         }

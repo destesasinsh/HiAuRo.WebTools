@@ -708,7 +708,7 @@ body {
 
 .main {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr) 320px;
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
     min-height: 0;
     background: var(--bg0);
 }
@@ -735,9 +735,44 @@ body {
     background: var(--bg0);
 }
 
+.editor-workbench {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+    height: 100%;
+    min-height: 0;
+}
+
 .editor-scroll,
 .tree-scroll {
+    min-width: 0;
+    min-height: 0;
     padding: 18px 20px;
+}
+
+.inline-inspector {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg1);
+    border-left: 1px solid var(--bd);
+}
+
+.inspector-head {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--bd);
+    background: var(--bg1);
+}
+
+.inline-inspector .props-scroll {
+    flex: 1;
+    min-height: 0;
+    padding: 14px 16px 18px;
+    overflow-y: auto;
 }
 
 .fileside-head {
@@ -970,6 +1005,30 @@ body {
     padding-right: 2px;
 }
 
+.selection-summary-section {
+    flex: 0 0 auto;
+}
+
+.selection-summary {
+    color: var(--tx1);
+    font-size: 12px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.selection-summary .summary-type {
+    display: block;
+    color: var(--tx0);
+    font-weight: 700;
+}
+
+.selection-summary .summary-path {
+    display: block;
+    margin-top: 4px;
+    color: var(--tx2);
+    font-variant-numeric: tabular-nums;
+}
+
 .ed-prop-section {
     border-top: 1px solid var(--bd);
 }
@@ -1138,6 +1197,18 @@ textarea:focus-visible,
     }
 }
 
+@media (max-width: 1180px) {
+    .editor-workbench {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(280px, 1fr) minmax(320px, 42vh);
+    }
+
+    .inline-inspector {
+        border-left: 0;
+        border-top: 1px solid var(--bd);
+    }
+}
+
 @media (max-width: 640px) {
     body {
         overflow: auto;
@@ -1190,7 +1261,13 @@ textarea:focus-visible,
     }
 
     .editor-panel {
-        min-height: 460px;
+        min-height: 760px;
+    }
+
+    .editor-workbench {
+        height: auto;
+        min-height: 720px;
+        grid-template-rows: minmax(300px, 1fr) minmax(360px, auto);
     }
 
     .sidebar {
