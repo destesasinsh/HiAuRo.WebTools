@@ -3,38 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
 <title>HiAuRo 时间轴编辑器</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="puppertino/buttons.css">
 <link rel="stylesheet" href="puppertino/forms.css">
 <link rel="stylesheet" href="puppertino/segmented-controls.css">
 <link rel="stylesheet" href="puppertino-bridge.css">
-<link rel="stylesheet" href="editor.css">
+<link rel="stylesheet" href="editor.css?v=3">
 </head>
 <body>
 <div id="app">
   <div class="page-drop-zone" id="pageDropZone">
     <div class="page-drop-card">
       <div class="page-drop-title">拖拽 JSON 到这里</div>
-      <div class="page-drop-desc">自动识别轴文件、`trigger-catalog.json` 或触发器定义</div>
+      <div class="page-drop-desc">自动识别轴文件、trigger-catalog.json 或触发器定义</div>
     </div>
   </div>
   <header class="toolbar">
-    <div class="actions" style="padding-right:8px">
-      <a class="p-btn" href="./index.html" style="text-decoration:none">返回首页</a>
+    <div class="toolbar-brand">
+      <a class="p-btn home-link" href="./index.html" aria-label="返回首页"><span aria-hidden="true">←</span><span>首页</span></a>
+      <div class="toolbar-heading">
+        <div class="toolbar-title">HiAuRo 轴编辑器</div>
+        <div class="toolbar-subtitle">执行轴 / 辅助轴 JSON</div>
+      </div>
     </div>
-    <div class="p-segmented-controls">
-      <button class="tab active" data-axis="execution">执行轴</button>
-      <button class="tab" data-axis="assist">辅助轴</button>
+    <div class="p-segmented-controls axis-switch" aria-label="轴类型">
+      <button class="tab active" type="button" data-axis="execution">执行轴</button>
+      <button class="tab" type="button" data-axis="assist">辅助轴</button>
     </div>
-    <div class="actions">
-      <button class="p-btn" id="btnNew">新建</button>
-      <button class="p-btn" id="btnLoad">加载</button>
-      <button class="p-btn p-prim-col" id="btnSave">保存</button>
-      <button class="p-btn" id="btnSaveAs">另存</button>
-      <button class="p-btn" id="btnExport">导出</button>
-      <button class="p-btn" id="btnImport">导入</button>
-      <span class="status" id="edStatus"></span>
+    <div class="actions toolbar-actions">
+      <button class="p-btn" type="button" id="btnNew">新建</button>
+      <button class="p-btn" type="button" id="btnLoad">加载</button>
+      <button class="p-btn p-prim-col" type="button" id="btnSave">保存</button>
+      <button class="p-btn" type="button" id="btnSaveAs">另存</button>
+      <button class="p-btn" type="button" id="btnExport">导出</button>
+      <button class="p-btn" type="button" id="btnImport">导入</button>
+      <span class="status" id="edStatus" role="status" aria-live="polite"></span>
     </div>
   </header>
 
@@ -42,18 +47,18 @@
     <aside class="fileside" id="filePanel">
       <div class="fileside-head">
         <span class="sidebar-label">文件</span>
-        <button class="p-btn" id="btnPickDir" style="font-size:10px;padding:2px 8px">选择目录</button>
+        <button class="p-btn p-btn-sm" type="button" id="btnPickDir">选择目录</button>
       </div>
       <div class="fileside-dir" id="fileDir">未选择目录</div>
       <div class="fileside-list" id="fileList">
         <div class="props-hint">点"选择目录"浏览文件</div>
       </div>
-      <div style="padding:6px;border-top:1px solid var(--bd);margin-top:6px">
-        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px">工具</div>
-        <div style="display:flex;flex-direction:column;gap:3px">
-          <button class="p-btn" id="btnLoadCatalog2" style="width:100%;font-size:12px;padding:4px 6px">📂 触发器库</button>
-          <button class="p-btn" id="btnImportTrigger2" style="width:100%;font-size:12px;padding:4px 6px">📥 导入触发器</button>
-          <button class="p-btn" id="btnLoadFactAxisBar2" style="width:100%;font-size:12px;padding:4px 6px">📋 加载事实轴</button>
+      <div class="fileside-tools">
+        <div class="tools-title">工具</div>
+        <div class="tools-actions">
+          <button class="p-btn tool-btn" type="button" id="btnLoadCatalog2"><span class="tool-mark catalog" aria-hidden="true"></span><span>触发器库</span></button>
+          <button class="p-btn tool-btn" type="button" id="btnImportTrigger2"><span class="tool-mark import" aria-hidden="true"></span><span>导入触发器</span></button>
+          <button class="p-btn tool-btn" type="button" id="btnLoadFactAxisBar2"><span class="tool-mark fact" aria-hidden="true"></span><span>加载事实轴</span></button>
         </div>
       </div>
     </aside>
@@ -61,11 +66,13 @@
     <section class="editor-panel" id="treePanel">
       <div class="editor-scroll" id="treeScroll">
         <div class="empty-state" id="emptyTree">
-          <div class="empty-icon">📄</div>
+          <div class="empty-mark" aria-hidden="true">JSON</div>
           <div class="empty-title">开始编辑时间轴</div>
-          <button class="p-btn p-prim-col" id="btnNewBig">新建模板</button>
-          <button class="p-btn" id="btnLoadBig" style="margin-top:6px">加载文件</button>
-          <div style="margin-top:10px;font-size:11px;color:var(--tx2)">或拖拽轴 JSON / trigger-catalog.json 到页面</div>
+          <div class="empty-actions">
+            <button class="p-btn p-prim-col" type="button" id="btnNewBig">新建模板</button>
+            <button class="p-btn" type="button" id="btnLoadBig">加载文件</button>
+          </div>
+          <div class="hint-line">或拖拽轴 JSON / trigger-catalog.json 到页面</div>
         </div>
         <div class="etree" id="etree" style="display:none"></div>
       </div>
@@ -74,9 +81,9 @@
     <aside class="sidebar">
       <!-- 轴信息面板（可收起、独立于属性面板） -->
       <div class="axis-panel" id="axisPanel">
-        <div class="axis-panel-bar" id="axisPanelBar" onclick="toggleAxisPanel()">
+        <button class="axis-panel-bar" id="axisPanelBar" type="button" onclick="toggleAxisPanel()">
           <span id="axisPanelLabel">▶ 轴信息</span>
-        </div>
+        </button>
         <div class="axis-panel-body hidden" id="axisPanelBody">
           <div class="info-box">
             <div class="info-row"><span class="info-key">轴类型</span><span class="info-val" id="infoType">—</span></div>
@@ -109,7 +116,7 @@
           <div class="sidebar-section" style="margin-top:4px">
             <div class="sidebar-label">暴露变量</div>
             <div id="varList" style="max-height:120px;overflow-y:auto"></div>
-            <button class="btn-sm" id="btnAddVar" style="margin-top:4px;font-size:11px">+ 添加变量</button>
+            <button class="btn-sm" type="button" id="btnAddVar" style="margin-top:4px;font-size:11px">+ 添加变量</button>
           </div>
         </div>
       </div>
@@ -118,14 +125,14 @@
       <div class="sidebar-section" id="treeTools" style="display:none">
         <div class="sidebar-label">快捷添加</div>
         <div class="quick-btns">
-          <button class="qbtn" data-add="treeSequence"><span class="qdot" style="background:#30d158"></span>序列</button>
-          <button class="qbtn" data-add="treeCondNode"><span class="qdot" style="background:#15aabf"></span>条件</button>
-          <button class="qbtn" data-add="treeActionNode"><span class="qdot" style="background:#f06595"></span>动作</button>
-          <button class="qbtn" data-add="treeDelayNode"><span class="qdot" style="background:#fcc419"></span>延迟</button>
-          <button class="qbtn" data-add="treeLoop"><span class="qdot" style="background:#ff375f"></span>循环</button>
-          <button class="qbtn" data-add="treeParallel"><span class="qdot" style="background:#ff9f0a"></span>并行</button>
-          <button class="qbtn" data-add="treeSelect"><span class="qdot" style="background:#bf5af2"></span>选择</button>
-          <button class="qbtn" data-add="treeScriptNode"><span class="qdot" style="background:#4dabf7"></span>脚本</button>
+          <button class="qbtn" type="button" data-add="treeSequence"><span class="qdot" style="background:#30d158"></span>序列</button>
+          <button class="qbtn" type="button" data-add="treeCondNode"><span class="qdot" style="background:#15aabf"></span>条件</button>
+          <button class="qbtn" type="button" data-add="treeActionNode"><span class="qdot" style="background:#f06595"></span>动作</button>
+          <button class="qbtn" type="button" data-add="treeDelayNode"><span class="qdot" style="background:#fcc419"></span>延迟</button>
+          <button class="qbtn" type="button" data-add="treeLoop"><span class="qdot" style="background:#ff375f"></span>循环</button>
+          <button class="qbtn" type="button" data-add="treeParallel"><span class="qdot" style="background:#ff9f0a"></span>并行</button>
+          <button class="qbtn" type="button" data-add="treeSelect"><span class="qdot" style="background:#bf5af2"></span>选择</button>
+          <button class="qbtn" type="button" data-add="treeScriptNode"><span class="qdot" style="background:#4dabf7"></span>脚本</button>
         </div>
         <div class="sidebar-hint">选中父节点后点击添加</div>
       </div>
@@ -142,6 +149,6 @@
   <input type="file" id="edFileInput" accept=".json,.txt" style="display:none">
   <input type="file" id="factFileInput" accept=".json" style="display:none">
 </div>
-<script src="editor.js"></script>
+<script src="editor.js?v=3"></script>
 </body>
 </html>

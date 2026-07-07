@@ -231,10 +231,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ==================== 轴切换 ====================
 
-function switchAxis() {
+function switchAxis(keepSelection) {
     document.getElementById('treePanel').style.display = 'flex';
     document.getElementById('treeTools').style.display = '';
-    selectedNodePath = null;
+    if (!keepSelection) selectedNodePath = null;
     renderTree();
     renderProps();
     updateFooter();
@@ -256,6 +256,10 @@ function renderTree() {
     var root = timelineData.TreeRoot || timelineData.treeRoot;
     treeEl.innerHTML = root ? buildTreeNodeHtml(root, '', 0) : '<div class="tn-row">空</div>';
     bindTreeClicks();
+}
+
+function getTimelineRoot() {
+    return timelineData && (timelineData.TreeRoot || timelineData.treeRoot);
 }
 
 function detectType(node) {
@@ -1013,7 +1017,7 @@ function renderProps() {
             } else {
                 h += prop('\u4e8b\u5b9e\u8f74\u8282\u70b9 ID', 'text', node, 'FactNodeId');
             }
-            h += '<div class="ed-prop-row"><button class="btn-sm" style="margin-top:2px" id="btnLoadFactAxis" type="button">\ud83d\udcc2 \u52a0\u8f7d\u4e8b\u5b9e\u8f74</button></div>';
+            h += '<div class="ed-prop-row"><button class="btn-sm" style="margin-top:2px" id="btnLoadFactAxis" type="button">\u52a0\u8f7d\u4e8b\u5b9e\u8f74</button></div>';
             h += '<textarea class="ed-prop-area" id="dfScript" style="width:100%;height:80px;font-size:11px;font-family:monospace">'+esc(node.Script||'')+'</textarea>'; h += '<button class="btn-sm" style="margin-top:4px" onclick="saveTreeScript()">保存脚本</button>'; h += '</div>'; }
         body.innerHTML = h;
         bindTreePropInputs();
@@ -1033,15 +1037,24 @@ function prop(label, type, obj, key) {
 }
 
 function bindTreePropInputs() {
-    document.querySelectorAll('#edPropsBody .ed-prop-input').forEach(function(el) {
+    document.querySelectorAll('#propsBody .ed-prop-input').forEach(function(el) {
         if (el.dataset.bound) return; el.dataset.bound = '1';
-        el.addEventListener('change', function() {
+        function commit(refreshProps) {
             var node = getNodeByPath(selectedNodePath);
             if (!node) return;
-            var key = this.dataset.key;
-            node[key] = this.type==='checkbox' ? this.checked : (this.type==='number' ? Number(this.value) : this.value);
-            markDirty();
-        });
+            var key = el.dataset.key;
+            node[key] = el.type==='checkbox' ? el.checked : (el.type==='number' ? Number(el.value) : el.value);
+            isDirty = true;
+            renderTree();
+            if (refreshProps) renderProps();
+            updateFooter();
+        }
+        if (el.type === 'checkbox') {
+            el.addEventListener('change', function() { commit(true); });
+        } else {
+            el.addEventListener('input', function() { commit(false); });
+            el.addEventListener('change', function() { commit(true); });
+        }
     });
 }
 
@@ -1188,13 +1201,13 @@ function isTriggerItem(data) {
     return !!(data && typeof data === 'object' && data.typeName && data.displayName);
 }
 
-function loadTimelineData(data, fileName) {
+function loadTimelineData(data, fileName, handle) {
     timelineData = data;
     currentFile = fileName || '';
-    fileHandle = null;
+    fileHandle = handle || null;
     isDirty = false;
-    selectedNodePath = null;
-    switchAxis();
+    selectedNodePath = getTimelineRoot() ? 'n' : null;
+    switchAxis(true);
     syncMeta();
     setStatus('已加载: ' + (fileName || 'JSON'), 'success');
 }
@@ -1315,7 +1328,7 @@ async function openFromDir(fileName) {
     try {
         var file = await entry.handle.getFile();
         fileHandle = entry.handle;
-        readFileObj(file);
+        readFileObj(file, entry.handle);
     } catch(e) { setStatus('打开失败: ' + e.message, 'error'); }
 }
 
@@ -1324,18 +1337,18 @@ async function openFromDir(fileName) {
 function newFile() {
     if (isDirty && !confirm('当前有未保存的修改，是否放弃？')) return;
     timelineData = { Name:'新执行轴', TerritoryTypeId:0, Note:'', Guid:generateUUID(), ExposedVars:[], TreeRoot:{ '$type':'HiAuRo.Execution.TreeRoot, HiAuRo', DisplayName:'Root', Id:1, Enable:true, Remark:'', Tag:'', Childs:[] } };
-    currentFile=''; fileHandle=null; isDirty=true; selectedNodePath=null;
-    switchAxis(); setStatus('已新建');
+    currentFile=''; fileHandle=null; isDirty=true; selectedNodePath='n';
+    switchAxis(true); setStatus('已新建');
 }
 async function loadFile() {
     if (isDirty && !confirm('当前有未保存的修改，是否放弃？')) return;
     if (window.showOpenFilePicker) {
-        try { var handles = await window.showOpenFilePicker({ types:[{ description:'JSON', accept:{'application/json':['.json','.txt']} }] }); var file = await handles[0].getFile(); fileHandle = handles[0]; readFileObj(file); } catch(e) {}
+        try { var handles = await window.showOpenFilePicker({ types:[{ description:'JSON', accept:{'application/json':['.json','.txt']} }] }); var file = await handles[0].getFile(); readFileObj(file, handles[0]); } catch(e) {}
     } else document.getElementById('edFileInput').click();
 }
-function readFileObj(file) {
+function readFileObj(file, handle) {
     readJsonFile(file, function(data) {
-        loadTimelineData(data, file.name);
+        loadTimelineData(data, file.name, handle);
     }, 'JSON解析失败: ');
 }
 async function saveFile() {
