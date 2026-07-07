@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!Array.isArray(items)) items = [items];
                 items.forEach(function(item) {
                     if (!item.typeName || !item.displayName) { setStatus('跳过无效项: 缺少 typeName 或 displayName', 'error'); return; }
-                    item.category = 'local';
+                    if (!item.category) item.category = 'local';
                     item.cloudSync = false;
                     var isCond = item.typeName.toLowerCase().indexOf('cond') >= 0;
                     var list = isCond ? localTriggers.conditions : localTriggers.actions;
@@ -541,16 +541,14 @@ function hideContextMenu() {
 function renderQuickField(ctrl, val) {
     var valStr = val !== undefined && val !== null ? String(val) : '';
     var div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:4px;margin:2px 0';
-    div.innerHTML = '<span style="font-size:10px;color:var(--tx2);min-width:60px">' + esc(ctrl.label) + '</span>';
+    div.className = 'quick-field';
+    div.innerHTML = '<span>' + esc(ctrl.label) + '</span>';
     var input;
     if (ctrl.type === 'checkbox') {
         input = document.createElement('input');
         input.type = 'checkbox'; input.checked = !!val;
-        input.style.cssText = 'margin:0';
     } else if (ctrl.type === 'dropdown') {
         input = document.createElement('select');
-        input.style.cssText = 'flex:1;height:24px;font-size:11px;padding:1px 4px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx1);border-radius:3px';
         (ctrl.options || []).forEach(function(o) {
             var opt = document.createElement('option');
             opt.value = o; opt.textContent = o;
@@ -563,10 +561,82 @@ function renderQuickField(ctrl, val) {
         if (ctrl.type === 'floatInput') input.step = 'any';
         if (ctrl.type === 'intInput') input.step = '1';
         input.value = valStr;
-        input.style.cssText = 'flex:1;height:24px;font-size:11px;padding:1px 4px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx1);border-radius:3px';
     }
+    input.className = 'quick-input';
     div.appendChild(input);
     return div;
+}
+
+function getTriggerValue(item) {
+    return item && (item.aeTypeName || item.typeName || item.typeDiscriminator || '');
+}
+
+function getTriggerCategory(item) {
+    return (item && item.category) || '未分类';
+}
+
+function appendCatalogOptions(select, items, placeholder) {
+    select.innerHTML = '';
+    var first = document.createElement('option');
+    first.value = '';
+    first.textContent = placeholder;
+    select.appendChild(first);
+
+    var groups = {};
+    items.forEach(function(item) {
+        var value = getTriggerValue(item);
+        if (!value) return;
+        var category = getTriggerCategory(item);
+        (groups[category] || (groups[category] = [])).push(item);
+    });
+
+    Object.keys(groups).sort().forEach(function(category) {
+        var group = document.createElement('optgroup');
+        group.label = category;
+        groups[category].sort(function(a, b) {
+            return String(a.displayName || a.typeName || '').localeCompare(String(b.displayName || b.typeName || ''), 'zh-Hans-CN');
+        }).forEach(function(item) {
+            var opt = document.createElement('option');
+            opt.value = getTriggerValue(item);
+            opt.textContent = item.displayName || item.typeName || getTriggerValue(item);
+            group.appendChild(opt);
+        });
+        select.appendChild(group);
+    });
+}
+
+function appendQuickAddRow(pop, items, placeholder, onAdd) {
+    if (!items.length) {
+        var empty = document.createElement('div');
+        empty.className = 'quick-empty';
+        empty.textContent = '没有可用项，请先导入触发器库';
+        pop.appendChild(empty);
+        return;
+    }
+    var row = document.createElement('div');
+    row.className = 'quick-add-row';
+    var sel = document.createElement('select');
+    sel.className = 'quick-add-select';
+    appendCatalogOptions(sel, items, placeholder);
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.textContent = '+';
+    addBtn.className = 'quick-add-btn';
+    addBtn.addEventListener('click', function() {
+        if (!sel.value) return;
+        onAdd(sel.value);
+    });
+    row.appendChild(sel);
+    row.appendChild(addBtn);
+    pop.appendChild(row);
+}
+
+function readQuickValue(field) {
+    var input = field.querySelector('input,select,textarea');
+    if (!input) return undefined;
+    if (input.type === 'checkbox') return input.checked;
+    if (input.type === 'number') return parseFloat(input.value);
+    return input.value;
 }
 
 // 双击弹窗
@@ -597,92 +667,58 @@ function showQuickPopup(e, path, type, isComp) {
         if (type === 'treeCondNode') {
             // 渲染条件列表
             var conds = node.TriggerConds || [];
-            pop.innerHTML += '<div style="font-size:11px;color:var(--tx2);margin:4px 0">条件 (' + conds.length + ')</div>';
+            pop.innerHTML += '<div class="quick-section-title">条件 (' + conds.length + ')</div>';
             conds.forEach(function(cond, i) {
                 var ct = cond['$type'] || '';
                 var entry = findCatalogEntry(ct, true);
                 var name = entry ? entry.displayName : ct;
                 var row = document.createElement('div');
-                row.style.cssText = 'margin:3px 0;padding:4px;background:var(--bg1);border-radius:4px;font-size:11px';
-                row.innerHTML = '<div style="color:#7af;margin-bottom:3px">' + esc(name) + '</div>';
+                row.className = 'quick-entry';
+                row.innerHTML = '<div class="quick-entry-head"><span>' + esc(name) + '</span><span>' + esc(getTriggerCategory(entry)) + '</span></div>';
                 var ctrls = getEntryControls(entry);
                 ctrls.forEach(function(ctrl) {
                     var val = cond[ctrl.label] !== undefined ? cond[ctrl.label] : ctrl.defaultValue;
                     var inp = renderQuickField(ctrl, val);
                     inp.addEventListener('change', function() {
-                        if (this.type === 'checkbox') cond[ctrl.label] = this.checked;
-                        else if (this.type === 'number') cond[ctrl.label] = parseFloat(this.value);
-                        else cond[ctrl.label] = this.value;
+                        cond[ctrl.label] = readQuickValue(this);
                         markDirty();
                     });
                     row.appendChild(inp);
                 });
                 pop.appendChild(row);
             });
-            // 添加条件按钮
-            var addRow = document.createElement('div');
-            addRow.style.cssText = 'margin-top:6px;display:flex;gap:4px';
-            var allConds = getAllConditions();
-            if (allConds.length) {
-                var sel = document.createElement('select');
-                sel.style.cssText = 'flex:1;height:24px;font-size:11px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx1);border-radius:3px';
-                sel.innerHTML = '<option value="">+ 添加条件</option>';
-                allConds.forEach(function(c) { sel.innerHTML += '<option value="' + esc(c.typeDiscriminator || c.typeName) + '">' + esc(c.displayName || c.typeName) + '</option>'; });
-                var addBtn = document.createElement('button');
-                addBtn.textContent = '+'; addBtn.className = 'ed-add-btn';
-                addBtn.addEventListener('click', function() {
-                    if (!sel.value) return;
-                    addTriggerCond(path, sel.value);
-                    hideQuickPopup();
-                    showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
-                });
-                addRow.appendChild(sel); addRow.appendChild(addBtn);
-                pop.appendChild(addRow);
-            }
+            appendQuickAddRow(pop, getAllConditions(), '+ 添加条件', function(value) {
+                addTriggerCond(path, value);
+                hideQuickPopup();
+                showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
+            });
         } else if (type === 'treeActionNode') {
             var acts = node.TriggerActions || [];
-            pop.innerHTML += '<div style="font-size:11px;color:var(--tx2);margin:4px 0">动作 (' + acts.length + ')</div>';
+            pop.innerHTML += '<div class="quick-section-title">动作 (' + acts.length + ')</div>';
             acts.forEach(function(act, i) {
                 var at = act['$type'] || '';
                 var entry = findCatalogEntry(at, false);
                 var name = entry ? entry.displayName : at;
                 var row = document.createElement('div');
-                row.style.cssText = 'margin:3px 0;padding:4px;background:var(--bg1);border-radius:4px;font-size:11px';
-                row.innerHTML = '<div style="color:#f06595;margin-bottom:3px">' + esc(name) + '</div>';
+                row.className = 'quick-entry';
+                row.innerHTML = '<div class="quick-entry-head"><span>' + esc(name) + '</span><span>' + esc(getTriggerCategory(entry)) + '</span></div>';
                 var ctrls = getEntryControls(entry);
                 ctrls.forEach(function(ctrl) {
                     var val = act[ctrl.label] !== undefined ? act[ctrl.label] : ctrl.defaultValue;
                     var inp = renderQuickField(ctrl, val);
                     inp.addEventListener('change', function() {
-                        if (this.type === 'checkbox') act[ctrl.label] = this.checked;
-                        else if (this.type === 'number') act[ctrl.label] = parseFloat(this.value);
-                        else act[ctrl.label] = this.value;
+                        act[ctrl.label] = readQuickValue(this);
                         markDirty();
                     });
                     row.appendChild(inp);
                 });
                 pop.appendChild(row);
             });
-            // 添加动作按钮
-            var addRowA = document.createElement('div');
-            addRowA.style.cssText = 'margin-top:6px;display:flex;gap:4px';
-            var allActs = getAllActions();
-            if (allActs.length) {
-                var selA = document.createElement('select');
-                selA.style.cssText = 'flex:1;height:24px;font-size:11px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx1);border-radius:3px';
-                selA.innerHTML = '<option value="">+ 添加动作</option>';
-                allActs.forEach(function(a) { selA.innerHTML += '<option value="' + esc(a.typeDiscriminator || a.typeName) + '">' + esc(a.displayName || a.typeName) + '</option>'; });
-                var addBtnA = document.createElement('button');
-                addBtnA.textContent = '+'; addBtnA.className = 'ed-add-btn';
-                addBtnA.addEventListener('click', function() {
-                    if (!selA.value) return;
-                    addTriggerAction(path, selA.value);
-                    hideQuickPopup();
-                    showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
-                });
-                addRowA.appendChild(selA); addRowA.appendChild(addBtnA);
-                pop.appendChild(addRowA);
-            }
+            appendQuickAddRow(pop, getAllActions(), '+ 添加动作', function(value) {
+                addTriggerAction(path, value);
+                hideQuickPopup();
+                showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
+            });
         } else if (type === 'treeDelayNode') {
             var dRow = document.createElement('div');
             dRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:4px 0';
@@ -880,7 +916,7 @@ function moveSibling(path, delta) {
 
 function findCatalogEntry(typeName, isCond) {
     var list = isCond ? getAllConditions() : getAllActions();
-    return list.find(function(e) { return (e.aeTypeName || e.typeName) === typeName; });
+    return list.find(function(e) { return getTriggerValue(e) === typeName; });
 }
 
 function getEntryControls(entry) {
@@ -1243,11 +1279,11 @@ function loadTimelineData(data, fileName, handle) {
 
 function importCatalogData(catalog, fileName) {
     var conds = (catalog.conditions || []).map(function(c) {
-        c.category = 'catalog';
+        if (!c.category) c.category = 'catalog';
         return c;
     });
     var acts = (catalog.actions || []).map(function(a) {
-        a.category = 'catalog';
+        if (!a.category) a.category = 'catalog';
         return a;
     });
     localTriggers.conditions = conds.concat(localTriggers.conditions || []);
@@ -1262,7 +1298,7 @@ function importTriggerItems(items, fileName) {
     if (!Array.isArray(items)) items = [items];
     var imported = 0;
     items.forEach(function(item) {
-        item.category = 'local';
+        if (!item.category) item.category = 'local';
         item.cloudSync = false;
         var isCond = item.typeName.toLowerCase().indexOf('cond') >= 0;
         var list = isCond ? localTriggers.conditions : localTriggers.actions;
@@ -1447,7 +1483,7 @@ function addTriggerCond(nodePath, aeTypeName) {
     var node = getNodeByPath(nodePath);
     if (!node) return;
     if (!node.TriggerConds) node.TriggerConds = [];
-    var info = getAllConditions().find(function(c) { return (c.aeTypeName || c.typeName) === aeTypeName; });
+    var info = getAllConditions().find(function(c) { return getTriggerValue(c) === aeTypeName; });
     var newCond = { '$type': aeTypeName };
     getEntryControls(info).forEach(function(ctrl) {
         if (ctrl.defaultValue !== undefined && ctrl.defaultValue !== null) {
@@ -1470,7 +1506,7 @@ function addTriggerAction(nodePath, aeTypeName) {
     var node = getNodeByPath(nodePath);
     if (!node) return;
     if (!node.TriggerActions) node.TriggerActions = [];
-    var info = getAllActions().find(function(a) { return (a.aeTypeName || a.typeName) === aeTypeName; });
+    var info = getAllActions().find(function(a) { return getTriggerValue(a) === aeTypeName; });
     var newAct = { '$type': aeTypeName };
     getEntryControls(info).forEach(function(ctrl) {
         if (ctrl.defaultValue !== undefined && ctrl.defaultValue !== null) {

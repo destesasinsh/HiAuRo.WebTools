@@ -458,19 +458,49 @@ body.drag-active { user-select:none; -webkit-user-select:none; cursor:grabbing; 
 
 /* 双击快捷弹窗 */
 .quick-popup {
-    position: fixed; z-index: 1000;
-    background: var(--bg0, #222); border: 1px solid var(--bd, #555);
-    border-radius: 8px; padding: 8px; min-width: 180px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    position: fixed;
+    z-index: 1000;
+    min-width: 320px;
+    max-width: min(460px, calc(100vw - 24px));
+    max-height: min(620px, calc(100vh - 24px));
+    overflow: auto;
+    background: var(--bg1, #fff);
+    border: 1px solid var(--bd, #d8d8de);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 16px 44px rgba(0,0,0,0.16);
     animation: popIn 0.12s ease;
 }
 @keyframes popIn { from { opacity:0; transform:scale(0.95) } to { opacity:1; transform:scale(1) } }
-.quick-title { font-size:12px; font-weight:600; color:var(--tx2); padding:2px 0 6px 0; border-bottom:1px solid var(--bd); margin-bottom:4px; }
+.quick-title { font-size:13px; font-weight:800; color:var(--tx0); padding:0 0 8px 0; border-bottom:1px solid var(--bd); margin-bottom:8px; }
+.quick-section-title { font-size:11px; font-weight:700; color:var(--tx2); margin:8px 0 6px; }
 .quick-item {
     display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:4px;
     cursor:pointer; font-size:12px; color:var(--tx1);
 }
 .quick-item:hover { background:rgba(255,255,255,0.06); }
+.quick-entry { margin:6px 0; padding:8px; background:var(--bg2); border:1px solid var(--bd); border-radius:8px; font-size:12px; }
+.quick-entry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:6px; color:var(--blue); font-weight:700; }
+.quick-entry-head span:last-child { color:var(--tx2); font-weight:600; }
+.quick-field { display:grid; grid-template-columns:minmax(72px, .38fr) minmax(0, 1fr); align-items:center; gap:8px; margin:5px 0; }
+.quick-field > span { min-width:0; color:var(--tx1); font-size:12px; }
+.quick-input,
+.quick-add-select {
+    min-width:0;
+    min-height:32px;
+    padding:4px 8px;
+    background:var(--bg1);
+    color:var(--tx0);
+    border:1px solid var(--bd);
+    border-radius:6px;
+    font-family:var(--font);
+    font-size:12px;
+}
+.quick-input[type="checkbox"] { width:18px; min-height:18px; accent-color:var(--blue); }
+.quick-add-row { display:flex; gap:8px; margin-top:10px; }
+.quick-add-select { flex:1; }
+.quick-add-btn { width:36px; min-height:32px; border:1px solid var(--bd); border-radius:6px; background:var(--bg1); color:var(--blue); font-weight:800; }
+.quick-empty { margin-top:8px; color:var(--tx2); font-size:12px; }
 
 /* 轴信息面板（独立可收起） */
 .axis-panel { border-bottom: 1px solid var(--bd); }
@@ -1101,7 +1131,6 @@ textarea.prop-input:focus {
 }
 
 .trigger-cond-item,
-.quick-popup,
 .ctx-menu {
     background: var(--bg1);
     border: 1px solid var(--bd);
@@ -1287,6 +1316,10 @@ textarea:focus-visible,
 
     .empty-actions .p-btn {
         justify-content: center;
+    }
+
+    .quick-popup {
+        min-width: calc(100vw - 24px);
     }
 }
 
