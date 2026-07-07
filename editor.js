@@ -686,7 +686,8 @@ function appendQuickAddRow(pop, items, placeholder, onAdd) {
     addBtn.type = 'button';
     addBtn.textContent = '+';
     addBtn.className = 'quick-add-btn';
-    addBtn.addEventListener('click', function() {
+    addBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
         if (!sel.value) return;
         onAdd(sel.value);
     });
