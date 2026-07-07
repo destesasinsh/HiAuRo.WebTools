@@ -572,7 +572,71 @@ function getTriggerValue(item) {
 }
 
 function getTriggerCategory(item) {
-    return (item && item.category) || '未分类';
+    var category = (item && item.category) || '未分类';
+    if (category !== 'builtin') return category;
+    return deriveBuiltinTriggerCategory(item);
+}
+
+function hasAny(value, keys) {
+    return keys.some(function(key) { return value.indexOf(key) >= 0; });
+}
+
+function deriveBuiltinTriggerCategory(item) {
+    var key = ((item && item.displayName) || '') + ((item && (item.typeName || item.aeTypeName || item.typeDiscriminator)) || '');
+    var isAction = key.indexOf('TriggerAction') >= 0 || key.indexOf('.Action.') >= 0;
+    if (!isAction) {
+        if (hasAny(key, ['变量'])) return '内置\\变量';
+        if (hasAny(key, ['倒计时', '经过时间', '上次技能', '总是真'])) return '内置\\时间';
+        if (hasAny(key, ['技能冷却', '技能后', '收到技能效果', '无目标技能效果', '敌人读条'])) return '内置\\技能';
+        if (hasAny(key, ['单位', 'Actor', '目标', '角色类型', '职能'])) return '内置\\单位与目标';
+        if (hasAny(key, ['连线', '图标', 'Omega'])) return '内置\\机制';
+        if (hasAny(key, ['地图', '天气', '日志'])) return '内置\\环境';
+        return '内置\\条件';
+    }
+    if (hasAny(key, ['变量'])) return '内置\\变量';
+    if (hasAny(key, ['TP', '移动'])) return '内置\\移动';
+    if (hasAny(key, ['技能', '吃药', 'Slot'])) return '内置\\技能';
+    if (hasAny(key, ['切换', 'Rotation', '起手', '停手', '目标', '自动攻击'])) return '内置\\战斗控制';
+    if (hasAny(key, ['命令', '按键'])) return '内置\\系统';
+    return '内置\\动作';
+}
+
+function splitCategoryPath(category) {
+    return String(category || '未分类').split(/[\\/]+/).map(function(p) { return p.trim(); }).filter(Boolean);
+}
+
+function formatCategoryPath(category) {
+    var parts = splitCategoryPath(category);
+    return parts.length ? parts.join(' / ') : '未分类';
+}
+
+function triggerLabel(item) {
+    return item.displayName || item.typeName || getTriggerValue(item);
+}
+
+function sortTriggers(items) {
+    return items.filter(function(item) { return getTriggerValue(item); }).slice().sort(function(a, b) {
+        return formatCategoryPath(getTriggerCategory(a)).localeCompare(formatCategoryPath(getTriggerCategory(b)), 'zh-Hans-CN')
+            || String(triggerLabel(a)).localeCompare(String(triggerLabel(b)), 'zh-Hans-CN');
+    });
+}
+
+function buildTriggerSelectOptions(items, placeholder) {
+    var result = [{ value: '', label: placeholder }];
+    var seenGroups = {};
+    sortTriggers(items).forEach(function(item) {
+        var parts = splitCategoryPath(getTriggerCategory(item));
+        var path = '';
+        parts.forEach(function(part, depth) {
+            path = path ? path + '\\' + part : part;
+            if (!seenGroups[path]) {
+                seenGroups[path] = true;
+                result.push({ group: part, depth: depth });
+            }
+        });
+        result.push({ value: getTriggerValue(item), label: triggerLabel(item), depth: parts.length });
+    });
+    return result;
 }
 
 function appendCatalogOptions(select, items, placeholder) {
@@ -592,13 +656,13 @@ function appendCatalogOptions(select, items, placeholder) {
 
     Object.keys(groups).sort().forEach(function(category) {
         var group = document.createElement('optgroup');
-        group.label = category;
+        group.label = formatCategoryPath(category);
         groups[category].sort(function(a, b) {
-            return String(a.displayName || a.typeName || '').localeCompare(String(b.displayName || b.typeName || ''), 'zh-Hans-CN');
+            return String(triggerLabel(a)).localeCompare(String(triggerLabel(b)), 'zh-Hans-CN');
         }).forEach(function(item) {
             var opt = document.createElement('option');
             opt.value = getTriggerValue(item);
-            opt.textContent = item.displayName || item.typeName || getTriggerValue(item);
+            opt.textContent = triggerLabel(item);
             group.appendChild(opt);
         });
         select.appendChild(group);
@@ -639,15 +703,9 @@ function readQuickValue(field) {
     return input.value;
 }
 
-// 双击弹窗
-function showQuickPopup(e, path, type, isComp) {
-    hideQuickPopup();
+function renderQuickPopupContent(pop, path, type, isComp) {
     var node = getNodeByPath(path);
     if (!node) return;
-
-    var pop = document.createElement('div');
-    pop.className = 'quick-popup';
-    pop.id = 'quickPopup';
 
     if (isComp) {
         // 组合节点 → 快捷添加
@@ -689,8 +747,7 @@ function showQuickPopup(e, path, type, isComp) {
             });
             appendQuickAddRow(pop, getAllConditions(), '+ 添加条件', function(value) {
                 addTriggerCond(path, value);
-                hideQuickPopup();
-                showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
+                renderQuickPopupContent(pop, path, type, isComp);
             });
         } else if (type === 'treeActionNode') {
             var acts = node.TriggerActions || [];
@@ -716,8 +773,7 @@ function showQuickPopup(e, path, type, isComp) {
             });
             appendQuickAddRow(pop, getAllActions(), '+ 添加动作', function(value) {
                 addTriggerAction(path, value);
-                hideQuickPopup();
-                showQuickPopup({clientX: parseInt(pop.style.left), clientY: parseInt(pop.style.top)}, path, type, isComp);
+                renderQuickPopupContent(pop, path, type, isComp);
             });
         } else if (type === 'treeDelayNode') {
             var dRow = document.createElement('div');
@@ -753,6 +809,18 @@ function showQuickPopup(e, path, type, isComp) {
             infoRow.appendChild(infoIn); pop.appendChild(infoRow);
         }
     }
+}
+
+// 双击弹窗
+function showQuickPopup(e, path, type, isComp) {
+    hideQuickPopup();
+    var node = getNodeByPath(path);
+    if (!node) return;
+
+    var pop = document.createElement('div');
+    pop.className = 'quick-popup';
+    pop.id = 'quickPopup';
+    renderQuickPopupContent(pop, path, type, isComp);
 
     // 定位在双击位置附近
     pop.style.left = (e.clientX + 10) + 'px';
@@ -1009,8 +1077,7 @@ function renderProps() {
             h += '<label>条件列表 (' + (node.TriggerConds||[]).length + ' 项)</label>';
             var conds = getAllConditions();
             if (conds.length > 0) {
-                var condOpts = conds.map(function(c) { return { value: c.aeTypeName || c.typeName, label: (c.displayName || c.aeTypeName) + ' [' + (c.category||'') + ']' }; });
-                h += iosSelect([{value:'',label:'+ 添加条件...'}].concat(condOpts), '',
+                h += iosSelect(buildTriggerSelectOptions(conds, '+ 添加条件...'), '',
                     'addTriggerCond(\'' + selectedNodePath + '\', this.dataset.val)');
             } else {
                 h += '<div class="prop-hint">无可用条件（请导入或连接插件）</div>';
@@ -1038,8 +1105,7 @@ function renderProps() {
             h += '<label>动作列表 (' + (node.TriggerActions||[]).length + ' 项)</label>';
             var actions = getAllActions();
             if (actions.length > 0) {
-                var actOpts = actions.map(function(a) { return { value: a.aeTypeName || a.typeName, label: (a.displayName || a.aeTypeName) + ' [' + (a.category||'') + ']' }; });
-                h += iosSelect([{value:'',label:'+ 添加动作...'}].concat(actOpts), '',
+                h += iosSelect(buildTriggerSelectOptions(actions, '+ 添加动作...'), '',
                     'addTriggerAction(\'' + selectedNodePath + '\', this.dataset.val)');
             } else {
                 h += '<div class="prop-hint">无可用动作</div>';
@@ -1646,16 +1712,32 @@ function setStatus(msg, type) {
 }
 
 function iosSelect(opts, selVal, onchange) {
-    var h = '<div class="ios-sel" onclick="event.stopPropagation();this.classList.toggle(\'open\')">';
-    opts.forEach(function(opt) {
-        if (typeof opt === 'string') opt = {value:opt, label:opt};
-        var isSel = opt.value===selVal;
-        // 当前选中的选项不阻止冒泡，让父元素处理点击展开/收起
-        var clickHandler = isSel ? '' : ' onclick="event.stopPropagation();'+onchange+';this.parentElement.classList.remove(\'open\')"';
-        h += '<div class="ios-sel-opt'+(isSel?' sel':'')+'" data-val="'+esc(opt.value)+'"'+clickHandler+'>'+esc(opt.label)+'</div>';
+    var normalized = opts.map(function(opt) {
+        return typeof opt === 'string' ? { value: opt, label: opt } : opt;
     });
-    return h+'</div>';
+    var selected = normalized.find(function(opt) { return !opt.group && opt.value === selVal; })
+        || normalized.find(function(opt) { return !opt.group; })
+        || { value: '', label: '选择' };
+    var h = '<div class="ios-sel" onclick="event.stopPropagation();this.classList.toggle(\'open\')">';
+    h += '<div class="ios-sel-value" data-val="' + esc(selected.value) + '">' + esc(selected.label) + '</div>';
+    h += '<div class="ios-sel-menu">';
+    normalized.forEach(function(opt) {
+        if (opt.group) {
+            h += '<div class="ios-sel-group" style="--depth:' + (opt.depth || 0) + '">' + esc(opt.group) + '</div>';
+            return;
+        }
+        var isSel = opt.value===selVal;
+        var clickHandler = isSel ? '' : ' onclick="event.stopPropagation();'+onchange+';this.closest(\'.ios-sel\').classList.remove(\'open\')"';
+        h += '<div class="ios-sel-opt'+(isSel?' sel':'')+'" style="--depth:' + (opt.depth || 0) + '" data-val="'+esc(opt.value)+'"'+clickHandler+'>'+esc(opt.label)+'</div>';
+    });
+    return h+'</div></div>';
 }
-function iosSelectVal(sel, val) { sel.value = val; sel.querySelectorAll('.ios-sel-opt').forEach(function(o){o.classList.toggle('sel',o.dataset.val===val)}); }
+function iosSelectVal(sel, val) {
+    sel.value = val;
+    sel.querySelectorAll('.ios-sel-opt').forEach(function(o){o.classList.toggle('sel',o.dataset.val===val)});
+    var active = sel.querySelector('.ios-sel-opt.sel');
+    var value = sel.querySelector('.ios-sel-value');
+    if (active && value) value.textContent = active.textContent;
+}
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
